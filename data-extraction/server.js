@@ -2,6 +2,7 @@ var express = require('express');
 var fs      = require('fs');
 var request = require('request');
 var cheerio = require('cheerio');
+var casperModule = require('casper');
 var app     = express();
 
 app.get('/scrape', function(req, res){
@@ -42,7 +43,7 @@ app.get('/scrape', function(req, res){
   })
 });
 
-app.get('/autovit', function(req, res){
+app.get('/autovit1', function(req, res){
 
     var showKeys = function (object){
         console.log('Keys are: ');
@@ -74,6 +75,20 @@ app.get('/autovit', function(req, res){
     res.send('Check your console');
 
     });
+});
+
+app.get('/autovit', function(req, res){
+
+    var showKeys = function (object){
+        console.log('Keys are: ');
+        Object.keys(object).forEach(function(it){
+            console.log(' key: ' + it);
+        });
+    };
+
+	
+    res.send('Check your console');
+
 });
 
 app.listen('8081');
