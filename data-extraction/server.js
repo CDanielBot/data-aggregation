@@ -43,7 +43,7 @@ app.get('/scrape', function(req, res){
   })
 });
 
-app.get('/autovit1', function(req, res){
+app.get('/autovit', function(req, res){
 
     var showKeys = function (object){
         console.log('Keys are: ');
@@ -75,20 +75,6 @@ app.get('/autovit1', function(req, res){
     res.send('Check your console');
 
     });
-});
-
-app.get('/autovit', function(req, res){
-
-    var showKeys = function (object){
-        console.log('Keys are: ');
-        Object.keys(object).forEach(function(it){
-            console.log(' key: ' + it);
-        });
-    };
-
-	
-    res.send('Check your console');
-
 });
 
 app.listen('8081');
