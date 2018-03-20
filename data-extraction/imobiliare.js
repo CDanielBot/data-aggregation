@@ -3,14 +3,11 @@ var fs      = require('fs');
 var request = require('request');
 var cheerio = require('cheerio');
 var app     = express();
+var fs      = require('fs');
 
-
-
-
-var ImobiliareProcessor = function(pageNumber) {
+var ImobiliareProcessor = function() {
 	
 	const baseUrl = 'https://www.imobiliare.ro/vanzare-apartamente/timis?id=82493432&pagina=';
-	let url = baseUrl + pageNumber;
 	let $ = null;
 	
 	var getNumberOfPages = function(){
@@ -63,19 +60,29 @@ var ImobiliareProcessor = function(pageNumber) {
 		return apartments;
 	};
 	
-	this.extractApartments = function(){
-		
+	var extractData = function(url, processHtmlFunc){
 		return new Promise(function(resolve,reject){
 			request(url, function(error, response, html){
 				if(error){
 					reject(error);
 				}else{
 					$ = cheerio.load(html);
-					//console.log('number of pages: ' + getNumberOfPages());
-					let apartments = getApartmentsForPage();
-					resolve(apartments);
+					let data = processHtmlFunc();
+					resolve(data);
 				}
 			});
+		});
+	};
+	
+	this.extractTotalNumberOfPages = function(){
+		return extractData(baseUrl + '1', function(){
+			return getNumberOfPages();
+		});
+	};
+	
+	this.extractApartmentsFromPage = function(pageNumber){
+		return extractData(baseUrl + pageNumber, function(){
+			return getApartmentsForPage();
 		});
 	};
 };
@@ -83,9 +90,32 @@ var ImobiliareProcessor = function(pageNumber) {
 
 app.get('/imobiliare', function(req, res){
 
-	let processor = new ImobiliareProcessor(1);
-	processor.extractApartments().then(function(apartments){
-		console.log(JSON.stringify(apartments));
+	let processor = new ImobiliareProcessor();
+	processor.extractTotalNumberOfPages().then(function(pagesNo){
+		pagesNo = parseInt(pagesNo);
+		console.log('Total number of pages: ' + pagesNo);
+		var promises = [];
+		var resolvedPromisesCount = 0;
+		
+		for(let i=1; i <= pagesNo; i++){
+			let pageProcessor = new ImobiliareProcessor();
+			var promise = pageProcessor.extractApartmentsFromPage(i);
+			promise.then(function(apartments){
+				resolvedPromisesCount++;
+				console.log('Resolved: ' + resolvedPromisesCount + ' out of ' + pagesNo);
+				return Promise.resolve(apartments);
+				
+			});
+			promises.push(promise);
+		}
+		
+		Promise.all(promises).then(function(results){
+			allApartments = [].concat.apply([], results);
+			console.log('Total number of extracted apartments: ' + allApartments.length);
+			fs.writeFile('apartments_imobiliare.json', JSON.stringify(allApartments), function(err){
+			  console.log('File successfully written! - Check your project directory for the apartments_imobiliare.json file');
+			});
+		});
 	});
 	
     res.send('Check your console');
