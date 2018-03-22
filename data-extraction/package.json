@@ -9,8 +9,6 @@
     "url": "https://github.com/scotch-io/node-web-scraper"
   },
   "dependencies": {
-    "babel-cli": "^6.0.0",
-    "babel-preset-es2015": "^6.0.0",
     "casperjs": "latest",
     "cheerio": "latest",
     "express": "latest",
@@ -22,6 +20,13 @@
     "request": "latest"
   },
   "scripts": {
-    "start": "babel-node --presets es2015 imobiliare.js"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "rimraf dist/ && babel ./ --out-dir dist/ --ignore ./node_modules,./.babelrc,./package.json,./npm-debug.log --copy-files",
+    "start": "npm run build && node dist/imobiliare.js"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-preset-es2015": "^6.24.1",
+    "rimraf": "^2.6.2"
   }
 }
