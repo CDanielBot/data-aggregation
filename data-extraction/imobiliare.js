@@ -3,22 +3,35 @@ var request = require('request');
 var cheerio = require('cheerio');
 var app     = express();
 var fs      = require('fs');
+let q       = require('q');
 
 'use strict';
 
-const baseUrl = 'https://www.imobiliare.ro/vanzare-apartamente/timis?id=82493432&pagina=';
+const UrlConstants = Object.freeze({
+    IMOBILIARE : 'https://www.imobiliare.ro/vanzare-apartamente/'
+});
 
-class ImobiliareProcessor {
+const Counties = Object.freeze({
+    TIMIS: {name: 'timis', id: '82493432'},
+    ARAD: {name: 'arad', id: 'todo'}
+});
 
-    _extractData(url, processHtmlFunc) {
+class ImobiliarePageProcessor {
+
+    constructor(county, pageNumber){
+        this.url = UrlConstants.IMOBILIARE + county.name + '?id=' + county.id + '&pagina=' + pageNumber;
+    }
+
+
+    _loadHtml() {
+        var self = this;
         return new Promise(function(resolve,reject){
-            request(url, function(error, response, html){
+            request(self.url, function(error, response, html){
                 if(error){
                     reject(error);
                 }else{
                     var $ = cheerio.load(html);
-                    var data = processHtmlFunc($);
-                    resolve(data);
+                    resolve($);
                 }
             });
         });
@@ -72,49 +85,82 @@ class ImobiliareProcessor {
     }
 
     extractTotalNumberOfPages() {
-        return this._extractData(baseUrl + '1', ($) => {
-        	return this._getNumberOfPages($)
-		})
+        return this._loadHtml().then( ($) => {
+            return this._getNumberOfPages($)
+        })
     }
 
-    extractApartmentsFromPage(pageNumber) {
-        return this._extractData(baseUrl + pageNumber, ($) => {
-        	return this._getApartmentsForPage($)
+    extractApartmentsAsJson() {
+        return this._loadHtml().then( ($) => {
+            return this._getApartmentsForPage($)
         })
     }
 
 }
 
+class ImobiliareCountyProcessor {
+
+    constructor(county){
+        this.county = county;
+    }
+
+    _extractDataFromAllPages(pagesNo, self) {
+
+        let _wrapPromiseWithStatus = function(promise) {
+            promise.then(function(apartments){
+                resolvedPromisesCount++;
+                console.log('Resolved: ' + resolvedPromisesCount + ' out of ' + pagesNo);
+                return Promise.resolve(apartments);
+            });
+        };
+
+        let _extractDataPromises = function(pagesNo){
+            var promises = [];
+
+            for(var i=1; i <= pagesNo; i++) {
+                var pageProcessor = new ImobiliarePageProcessor(self.county, i);
+                var promise = pageProcessor.extractApartmentsAsJson();
+                _wrapPromiseWithStatus(promise);
+                promises.push(promise);
+            }
+            return promises;
+        };
+
+        let resolvedPromisesCount = 0;
+        pagesNo = parseInt(pagesNo);
+        console.log('Total number of pages: ' + pagesNo);
+
+        let promises = _extractDataPromises(pagesNo);
+        return Promise.all(promises).then(function(results){
+            var allApartments = [].concat.apply([], results);
+            console.log('Total number of extracted apartments: ' + allApartments.length);
+            return Promise.resolve(allApartments);
+        })
+    }
+
+    extractApartmentsGeneralData() {
+        let deferred = q.defer();
+
+        let processor = new ImobiliarePageProcessor(this.county, 1);
+        processor.extractTotalNumberOfPages().then( (pageNo) => {
+                return this._extractDataFromAllPages(pageNo, this)
+            }).then(function(jsonData){
+                q.resolve(jsonData)
+            });
+        return deferred.promise;
+    }
+
+}
 
 app.get('/imobiliare', function(req, res){
 
-	var processor = new ImobiliareProcessor();
-	processor.extractTotalNumberOfPages().then(function(pagesNo){
-		pagesNo = parseInt(pagesNo);
-		console.log('Total number of pages: ' + pagesNo);
-		var promises = [];
-		var resolvedPromisesCount = 0;
-		
-		for(var i=1; i <= pagesNo; i++){
-			var pageProcessor = new ImobiliareProcessor();
-			var promise = pageProcessor.extractApartmentsFromPage(i);
-			promise.then(function(apartments){
-				resolvedPromisesCount++;
-				console.log('Resolved: ' + resolvedPromisesCount + ' out of ' + pagesNo);
-				return Promise.resolve(apartments);
-			});
-			promises.push(promise);
-		}
-		
-		Promise.all(promises).then(function(results){
-			var allApartments = [].concat.apply([], results);
-			console.log('Total number of extracted apartments: ' + allApartments.length);
-			fs.writeFile('apartments_imobiliare.json', JSON.stringify(allApartments), function(){
-			  console.log('File successfully written! - Check your project directory for the apartments_imobiliare.json file')
-			})
-		})
-	});
-	
+    let countyProcessor = new ImobiliareCountyProcessor(Counties.TIMIS);
+    countyProcessor.extractApartmentsGeneralData().then(function(apartmentsJson){
+        fs.writeFile('apartments_imobiliare.json', JSON.stringify(apartmentsJson), function(){
+            console.log('File successfully written! - Check your project directory for the apartments_imobiliare.json file')
+        })
+    });
+
     res.send('Check your console');
 });
 
