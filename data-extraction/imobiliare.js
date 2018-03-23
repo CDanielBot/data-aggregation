@@ -1,8 +1,5 @@
-var express = require('express');
-var request = require('request');
-var cheerio = require('cheerio');
-var app     = express();
-var fs      = require('fs');
+let request = require('request');
+let cheerio = require('cheerio');
 let q       = require('q');
 
 'use strict';
@@ -13,7 +10,7 @@ const UrlConstants = Object.freeze({
 
 const Counties = Object.freeze({
     TIMIS: {name: 'timis', id: '82493432'},
-    ARAD: {name: 'arad', id: 'todo'}
+    ARAD: {name: 'arad', id: '82494820'}
 });
 
 class ImobiliarePageProcessor {
@@ -24,13 +21,13 @@ class ImobiliarePageProcessor {
 
 
     _loadHtml() {
-        var self = this;
+        let self = this;
         return new Promise(function(resolve,reject){
             request(self.url, function(error, response, html){
                 if(error){
                     reject(error);
                 }else{
-                    var $ = cheerio.load(html);
+                    let $ = cheerio.load(html);
                     resolve($);
                 }
             });
@@ -43,16 +40,16 @@ class ImobiliarePageProcessor {
 
     _getApartmentsForPage($) {
 
-        var apartments = [];
+        let apartments = [];
 
-        var titles = $('.titlu-anunt.hidden-xs');
-        var traits = $('.caracteristici');
-        var prices = $('div.pret');
-        var comissions = $('.comision');
+        let titles = $('.titlu-anunt.hidden-xs');
+        let traits = $('.caracteristici');
+        let prices = $('div.pret');
+        let comissions = $('.comision');
 
         titles.each(function(){
-            var $title = $(this);
-            var apartment = {};
+            let $title = $(this);
+            let apartment = {};
             apartment.title = $title.children().attr('title');
             apartment.href = $title.children().attr('href');
             apartment.longTitle = $title.children().children().text();
@@ -60,24 +57,24 @@ class ImobiliarePageProcessor {
         });
 
         traits.each(function(i){
-            var apartment = apartments[i];
+            let apartment = apartments[i];
             apartment.traits = [];
-            var traitsList = $(this).children();
+            let traitsList = $(this).children();
             traitsList.each(function(){
-                var $trait = $(this);
+                let $trait = $(this);
                 apartment.traits.push($trait.text());
             })
         });
 
         prices.each(function(i){
-            var $price = $(this);
-            var apartment = apartments[i];
+            let $price = $(this);
+            let apartment = apartments[i];
             apartment.price = $price.find('.pret-mare').text();
             apartment.priceCurrency = $price.find('.tva-luna').text()
         });
 
         comissions.each(function(i){
-            var $commission = $(this);
+            let $commission = $(this);
             apartments[i].comission = $commission.text();
         });
 
@@ -115,11 +112,11 @@ class ImobiliareCountyProcessor {
         };
 
         let _extractDataPromises = function(pagesNo){
-            var promises = [];
+            let promises = [];
 
-            for(var i = 1; i <= pagesNo; i++) {
-                var pageProcessor = new ImobiliarePageProcessor(county, i);
-                var promise = pageProcessor.extractApartmentsAsJson();
+            for(let i = 1; i <= pagesNo; i++) {
+                let pageProcessor = new ImobiliarePageProcessor(county, i);
+                let promise = pageProcessor.extractApartmentsAsJson();
                 _wrapPromiseWithStatus(promise);
                 promises.push(promise);
             }
@@ -132,7 +129,7 @@ class ImobiliareCountyProcessor {
 
         let promises = _extractDataPromises(pagesNo);
         return Promise.all(promises).then(function(results){
-            var allApartments = [].concat.apply([], results);
+            let allApartments = [].concat.apply([], results);
             return Promise.resolve(allApartments);
         })
     }
@@ -151,19 +148,6 @@ class ImobiliareCountyProcessor {
 
 }
 
-app.get('/imobiliare', function(req, res){
-
-    let countyProcessor = new ImobiliareCountyProcessor(Counties.TIMIS);
-    countyProcessor.extractApartmentsGeneralData().then(function(apartmentsJson){
-        fs.writeFile('apartments_imobiliare.json', JSON.stringify(apartmentsJson), function(){
-            console.log('File successfully written! - Check your project directory for the apartments_imobiliare.json file')
-        })
-    });
-
-    res.send('Check your console');
-});
+module.exports = {ImobiliareCountyProcessor, Counties}
 
 
-app.listen('8081');
-console.log('Going to extract apartment from imobiliare.ro');
-exports = module.exports = app;
