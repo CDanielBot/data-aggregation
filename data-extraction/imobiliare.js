@@ -104,7 +104,7 @@ class ImobiliareCountyProcessor {
         this.county = county;
     }
 
-    _extractDataFromAllPages(pagesNo, self) {
+    _extractDataFromAllPages(county, pagesNo) {
 
         let _wrapPromiseWithStatus = function(promise) {
             promise.then(function(apartments){
@@ -117,8 +117,8 @@ class ImobiliareCountyProcessor {
         let _extractDataPromises = function(pagesNo){
             var promises = [];
 
-            for(var i=1; i <= pagesNo; i++) {
-                var pageProcessor = new ImobiliarePageProcessor(self.county, i);
+            for(var i = 1; i <= pagesNo; i++) {
+                var pageProcessor = new ImobiliarePageProcessor(county, i);
                 var promise = pageProcessor.extractApartmentsAsJson();
                 _wrapPromiseWithStatus(promise);
                 promises.push(promise);
@@ -133,7 +133,6 @@ class ImobiliareCountyProcessor {
         let promises = _extractDataPromises(pagesNo);
         return Promise.all(promises).then(function(results){
             var allApartments = [].concat.apply([], results);
-            console.log('Total number of extracted apartments: ' + allApartments.length);
             return Promise.resolve(allApartments);
         })
     }
@@ -143,9 +142,9 @@ class ImobiliareCountyProcessor {
 
         let processor = new ImobiliarePageProcessor(this.county, 1);
         processor.extractTotalNumberOfPages().then( (pageNo) => {
-                return this._extractDataFromAllPages(pageNo, this)
+                return this._extractDataFromAllPages(this.county, pageNo)
             }).then(function(jsonData){
-                q.resolve(jsonData)
+                deferred.resolve(jsonData);
             });
         return deferred.promise;
     }
