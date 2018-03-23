@@ -7,7 +7,6 @@ let {PageProcessor} = require('./processors.js');
 
 'use strict';
 
-
 const Counties = Object.freeze({
     TIMIS: {name: 'timis', id: '82493432'},
     ARAD: {name: 'arad', id: '82494820'}
@@ -20,11 +19,11 @@ class ImobiliarePageProcessor extends PageProcessor{
     }
 
     buildPageUrl(county, pageNumber){
-        return Url.IMOBILIARE + county.name + '?id=' + county.id + '&pagina=' + pageNumber;
+        return Url.PUBLI24 + county.name + '/?pag=' + pageNumber;
     }
 
     getNumberOfPages($) {
-        return $('.butonpaginare').not('.inainte').last().text();
+        return $('.paginare').children().not('.arrow').last().text();
     }
 
     getApartmentsForPage($) {
@@ -69,7 +68,6 @@ class ImobiliarePageProcessor extends PageProcessor{
 
         return apartments;
     }
-
 }
 
 class ImobiliareCountyProcessor {
@@ -116,10 +114,10 @@ class ImobiliareCountyProcessor {
 
         let processor = new ImobiliarePageProcessor(this.county, 1);
         processor.extractTotalNumberOfPages().then( (pageNo) => {
-                return this._extractDataFromAllPages(this.county, pageNo)
-            }).then(function(jsonData){
-                deferred.resolve(jsonData);
-            });
+            return this._extractDataFromAllPages(this.county, pageNo)
+        }).then(function(jsonData){
+            deferred.resolve(jsonData);
+        });
         return deferred.promise;
     }
 
