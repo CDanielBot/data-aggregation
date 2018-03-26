@@ -20,11 +20,14 @@ app.get('/imobiliare', function(req, res){
 app.get('/publi24', function(req, res){
 
     let publi24Processor = new Publi24Processor();
-    publi24Processor.extractApartmentsGeneralData().then(function(apartmentsJson){
-        fs.writeFile('src/json/apartments_publi24.json', JSON.stringify(apartmentsJson), function(){
-            console.log('File successfully written! - Check your project directory for the apartments_publi24.json file')
-        })
+    publi24Processor.getData().then(function(apartmentsJson){
+        console.log(apartmentsJson.length);
     });
+    // publi24Processor.extractApartmentsGeneralData().then(function(apartmentsJson){
+    //     fs.writeFile('src/json/apartments_publi24.json', JSON.stringify(apartmentsJson), function(){
+    //         console.log('File successfully written! - Check your project directory for the apartments_publi24.json file')
+    //     })
+    // });
     res.send('Check your console');
 });
 

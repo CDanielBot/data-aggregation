@@ -1,15 +1,17 @@
+const phantom = require('phantom');
+
 let {Url} = require('./urls.js');
-let {PageProcessor, MultiplePagesProcessor} = require('./processors.js');
+let {DynamicPageProcessor, MultiplePagesProcessor} = require('./processors.js');
 
 'use strict';
 
-class Publi24PageProcessor extends PageProcessor{
+class Publi24PageProcessor extends DynamicPageProcessor {
 
-    constructor(pageNumber){
+    constructor(pageNumber) {
         super(pageNumber);
     }
 
-    buildPageUrl(pageNumber){
+    buildPageUrl(pageNumber) {
         return Url.PUBLI24 + '?pag=' + pageNumber;
     }
 
@@ -22,7 +24,7 @@ class Publi24PageProcessor extends PageProcessor{
         let prices = $('div.pret');
         let comissions = $('.comision');
 
-        titles.each(function(){
+        titles.each(function () {
             let $title = $(this);
             let apartment = {};
             apartment.title = $title.children().attr('title');
@@ -31,24 +33,24 @@ class Publi24PageProcessor extends PageProcessor{
             apartments.push(apartment);
         });
 
-        traits.each(function(i){
+        traits.each(function (i) {
             let apartment = apartments[i];
             apartment.traits = [];
             let traitsList = $(this).children();
-            traitsList.each(function(){
+            traitsList.each(function () {
                 let $trait = $(this);
                 apartment.traits.push($trait.text());
             })
         });
 
-        prices.each(function(i){
+        prices.each(function (i) {
             let $price = $(this);
             let apartment = apartments[i];
             apartment.price = $price.find('.pret-mare').text();
             apartment.priceCurrency = $price.find('.tva-luna').text()
         });
 
-        comissions.each(function(i){
+        comissions.each(function (i) {
             let $commission = $(this);
             apartments[i].comission = $commission.text();
         });
@@ -57,9 +59,9 @@ class Publi24PageProcessor extends PageProcessor{
     }
 }
 
-class Publi24Processor extends MultiplePagesProcessor {
+class Publi24AllPagesProcessor extends MultiplePagesProcessor {
 
-    constructor(){
+    constructor() {
         super();
     }
 
@@ -69,10 +71,40 @@ class Publi24Processor extends MultiplePagesProcessor {
 
     getTotalPagesNumber() {
         const firstPage = 1;
-        return new Publi24PageProcessor(firstPage).loadHtml().then(function($) {
+        return new Publi24PageProcessor(firstPage).loadHtml().then(function ($) {
             console.log('trying here: ' + $('.pagination').not('.arrow').length);
             return $('.pagination').not('.arrow').last().text();
         });
+    }
+
+}
+
+class Publi24Processor {
+
+    async loadContent() {
+        const instance = await phantom.create();
+        const page = await instance.createPage();
+        await page.on("onResourceRequested", function (requestData) {
+            console.info('Requesting', requestData.url)
+        });
+
+        const status = await page.open('https://stackoverflow.com/');
+        console.log(status);
+
+        const content = await page.property('content');
+
+        await instance.exit();
+
+        return Promise.resolve(content);
+    }
+
+    getData() {
+        // this.loadContent().then(function(htmlContent){
+        //    console.log(htmlContent);
+        // });
+
+        const processor = new Publi24AllPagesProcessor();
+        return processor.extractApartmentsGeneralData();
     }
 
 }

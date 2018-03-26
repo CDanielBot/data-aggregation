@@ -1,6 +1,7 @@
-let q = require('q');
-let request = require('request');
-let cheerio = require('cheerio');
+const q = require('q');
+const request = require('request');
+const cheerio = require('cheerio');
+const phantom = require('phantom');
 
 class PageProcessor {
 
@@ -38,6 +39,34 @@ class PageProcessor {
         })
     }
 }
+
+class DynamicPageProcessor extends PageProcessor{
+
+    constructor(pageNumber){
+        super(pageNumber);
+    }
+
+    async loadDynamicContent() {
+
+        const instance = await phantom.create();
+        const page = await instance.createPage();
+        const url = this.buildPageUrl();
+        const status = await page.open(url);
+        const content = await page.property('content');
+        await instance.exit();
+
+        return Promise.resolve(content);
+    }
+
+    loadHtml() {
+        return this.loadDynamicContent().then(function(htmlContent){
+            let $ = cheerio.load(htmlContent);
+            return Promise.resolve($);
+        });
+    }
+
+}
+
 
 class MultiplePagesProcessor{
 
@@ -100,6 +129,6 @@ class MultiplePagesProcessor{
 
 }
 
-module.exports = { PageProcessor, MultiplePagesProcessor}
+module.exports = {PageProcessor, DynamicPageProcessor, MultiplePagesProcessor}
 
 
