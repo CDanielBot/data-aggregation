@@ -1,29 +1,16 @@
-let request = require('request');
-let cheerio = require('cheerio');
-let q = require('q');
-
 let {Url} = require('./urls.js');
-let {PageProcessor} = require('./processors.js');
+let {PageProcessor, MultiplePagesProcessor} = require('./processors.js');
 
 'use strict';
 
-const Counties = Object.freeze({
-    TIMIS: {name: 'timis', id: '82493432'},
-    ARAD: {name: 'arad', id: '82494820'}
-});
+class Publi24PageProcessor extends PageProcessor{
 
-class ImobiliarePageProcessor extends PageProcessor{
-
-    constructor(county, pageNumber){
-        super(county, pageNumber);
+    constructor(pageNumber){
+        super(pageNumber);
     }
 
-    buildPageUrl(county, pageNumber){
-        return Url.PUBLI24 + county.name + '/?pag=' + pageNumber;
-    }
-
-    getNumberOfPages($) {
-        return $('.paginare').children().not('.arrow').last().text();
+    buildPageUrl(pageNumber){
+        return Url.PUBLI24 + '?pag=' + pageNumber;
     }
 
     getApartmentsForPage($) {
@@ -70,59 +57,26 @@ class ImobiliarePageProcessor extends PageProcessor{
     }
 }
 
-class ImobiliareCountyProcessor {
+class Publi24Processor extends MultiplePagesProcessor {
 
-    constructor(county){
-        this.county = county;
+    constructor(){
+        super();
     }
 
-    _extractDataFromAllPages(county, pagesNo) {
-
-        let _wrapPromiseWithStatus = function(promise) {
-            promise.then(function(apartments){
-                resolvedPromisesCount++;
-                console.log('Resolved: ' + resolvedPromisesCount + ' out of ' + pagesNo);
-                return Promise.resolve(apartments);
-            });
-        };
-
-        let _extractDataPromises = function(pagesNo){
-            let promises = [];
-
-            for(let i = 1; i <= pagesNo; i++) {
-                let pageProcessor = new ImobiliarePageProcessor(county, i);
-                let promise = pageProcessor.extractApartmentsAsJson();
-                _wrapPromiseWithStatus(promise);
-                promises.push(promise);
-            }
-            return promises;
-        };
-
-        let resolvedPromisesCount = 0;
-        pagesNo = parseInt(pagesNo);
-        console.log('Total number of pages: ' + pagesNo);
-
-        let promises = _extractDataPromises(pagesNo);
-        return Promise.all(promises).then(function(results){
-            let allApartments = [].concat.apply([], results);
-            return Promise.resolve(allApartments);
-        })
+    getPageProcessor(pageNumber) {
+        return new Publi24PageProcessor(pageNumber);
     }
 
-    extractApartmentsGeneralData() {
-        let deferred = q.defer();
-
-        let processor = new ImobiliarePageProcessor(this.county, 1);
-        processor.extractTotalNumberOfPages().then( (pageNo) => {
-            return this._extractDataFromAllPages(this.county, pageNo)
-        }).then(function(jsonData){
-            deferred.resolve(jsonData);
+    getTotalPagesNumber() {
+        const firstPage = 1;
+        return new Publi24PageProcessor(firstPage).loadHtml().then(function($) {
+            console.log('trying here: ' + $('.pagination').not('.arrow').length);
+            return $('.pagination').not('.arrow').last().text();
         });
-        return deferred.promise;
     }
 
 }
 
-module.exports = {ImobiliareCountyProcessor, Counties}
+module.exports = {Publi24Processor}
 
 
