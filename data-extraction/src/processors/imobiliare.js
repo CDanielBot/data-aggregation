@@ -10,17 +10,18 @@ const Counties = Object.freeze({
 });
 
 
-class ImobiliarePageProcessor extends PageProcessor {
+class ImobiliarePageProcessor{
 
     constructor(pageNumber, county) {
-        super(pageNumber, county);
+        this.url = this._buildPageUrl(pageNumber, county);
+        this.pageProcessor = new PageProcessor(this.url);
     }
 
-    buildPageUrl() {
-        return Url.IMOBILIARE + this.county.name + '?id=' + this.county.id + '&pagina=' + this.pageNumber;
+    _buildPageUrl(pageNumber, county) {
+        return Url.IMOBILIARE + county.name + '?id=' + county.id + '&pagina=' + pageNumber;
     }
 
-    getApartmentsForPage($) {
+    parseHtml($) {
 
         let apartments = [];
 
@@ -63,24 +64,51 @@ class ImobiliarePageProcessor extends PageProcessor {
         return apartments;
     }
 
+    async extractData(){
+        return await this.pageProcessor.extractData(this.parseHtml);
+    }
+
 }
 
-class ImobiliareCountyProcessor extends MultiplePagesProcessor {
+class ImobiliareCountyProcessor {
 
     constructor(county) {
-        super();
         this.county = county;
+        this.resolvedPromisesCount = 0;
     }
 
-    getPageProcessor(pageNumber) {
-        return new ImobiliarePageProcessor(pageNumber, this.county);
-    }
-
-    getTotalPagesNumber() {
-        const firstPage = 1;
-        return new ImobiliarePageProcessor(firstPage, this.county).loadHtml().then(function ($) {
-            return $('.butonpaginare').not('.inainte').last().text();
+    _wrapPromiseWithStatus(promise, pagesNo) {
+        promise.then((apartments) => {
+            this.resolvedPromisesCount++;
+            console.log('Resolved: ' + this.resolvedPromisesCount + ' out of ' + pagesNo);
+            return Promise.resolve(apartments);
         });
+    }
+
+    async _extractDataFromAllPages(pagesNo) {
+        console.log('Total number of pages: ' + pagesNo);
+        let promises = [];
+        for (let pageNo = 1; pageNo <= Math.min(pagesNo, 2); pageNo++) {
+            const pageProcessor = new ImobiliarePageProcessor(pageNo, this.county);
+            let promise = pageProcessor.extractData();
+            this._wrapPromiseWithStatus(promise, pagesNo);
+            promises.push(promise);
+        }
+        const results = await Promise.all(promises);
+        let allApartments = [].concat.apply([], results);
+        return allApartments;
+    }
+
+
+    async _getTotalPagesNumber() {
+        const pageProcessor = new ImobiliarePageProcessor(1, this.county);
+        const $ = await pageProcessor._loadHtml();
+        return $('.butonpaginare').not('.inainte').last().text();
+    }
+
+    async extractData() {
+        const pagesNo = await this._getTotalPagesNumber();
+        return this._extractDataFromAllPages(pagesNo)
     }
 
 }
@@ -89,7 +117,7 @@ class ImobiliareProcessor {
 
     extractData() {
         let processor = new ImobiliareCountyProcessor(Counties.ARAD);
-        return processor.extractApartmentsGeneralData();
+        return processor.extractData();
     }
 }
 

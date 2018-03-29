@@ -5,17 +5,19 @@ let {DynamicPageProcessor, MultiplePagesProcessor} = require('./processors.js');
 
 'use strict';
 
-class Publi24PageProcessor extends DynamicPageProcessor {
 
-    constructor(pageNumber) {
-        super(pageNumber);
+class Publi24PageProcessor{
+
+    constructor(pageNumber, phantomInstance) {
+        this.url = this._buildPageUrl(pageNumber);
+        this.pageProcessor = new DynamicPageProcessor(this.url, phantomInstance);
     }
 
-    buildPageUrl(pageNumber) {
-        return Url.PUBLI24 + '?pag=' + pageNumber;
+    async loadHtml() {
+        return this.pageProcessor._loadHtml();
     }
 
-    getApartmentsForPage($) {
+    parseHtml($) {
 
         let apartments = [];
 
@@ -60,23 +62,44 @@ class Publi24PageProcessor extends DynamicPageProcessor {
 
         return apartments;
     }
+
+    async extractData(){
+        return await this.pageProcessor.extractData(this.parseHtml);
+    }
 }
 
-class Publi24AllPagesProcessor extends MultiplePagesProcessor {
+class Publi24AllPagesProcessor {
 
-    constructor() {
-        super();
+    constructor(){
     }
 
-    getPageProcessor(pageNumber) {
-        return new Publi24PageProcessor(pageNumber);
+    _buildPageUrl(pageNumber) {
+        return Url.PUBLI24 + '?pag=' + pageNumber;
     }
 
-    getTotalPagesNumber() {
-        const firstPage = 1;
-        return new Publi24PageProcessor(firstPage).loadHtml().then(function ($) {
-            return $('.pagination').children().not('.arrow').last().text();
-        });
+    async _getTotalPagesNumber(phantomInstance) {
+        const pageProcessor = new Publi24PageProcessor(1, phantomInstance);
+        const $ = await pageProcessor.loadHtml();
+        return $('.pagination').children().not('.arrow').last().text();
+    }
+
+    async extractData() {
+        const phantomPool = new PhantomInstancesPool();
+        await phantomPool.init();
+
+        const phantomInstance = phantomPool.getPhantomInstance(1);
+        const pagesNo = await this._getTotalPagesNumber(phantomInstance);
+
+        console.log('Total number of pages: ' + pagesNo);
+        const queue = new Queue();
+        for (let pageNo = 1; pageNo <= pagesNo; pageNo++) {
+            queue.enqueue(this._buildPageUrl(pageNo));
+        }
+
+        for(let i = 1; i <= phantomPool.size(); i++) {
+            const phantomInstance = phantomPool.getPhantomInstance(i);
+            phantomInstance.startCrawling(queue);
+        }
     }
 
 }
@@ -85,10 +108,13 @@ class Publi24Processor {
 
     extractData() {
         const processor = new Publi24AllPagesProcessor();
-        return processor.extractApartmentsGeneralData();
+        return processor.extractData();
     }
 
 }
+
+
+
 
 module.exports = {Publi24Processor}
 
